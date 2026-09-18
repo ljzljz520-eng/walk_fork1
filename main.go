@@ -409,18 +409,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				destDir := m.path
 				baseName := filepath.Base(m.yankedFilePath)
 				destPath := filepath.Join(destDir, baseName)
-				
-				// Don't paste if file already exists
-				if _, err := os.Stat(destPath); err == nil {
-					m.pasteError = "file already exists"
-				} else {
-					err := m.pasteFile(m.yankedFilePath, destPath)
-					if err != nil {
-						m.pasteError = err.Error()
+
+				err := m.pasteFile(m.yankedFilePath, destPath)
+				if err != nil {
+					if os.IsExist(err) {
+						m.pasteError = "file already exists"
 					} else {
-						m.pastedFilePath = baseName
-						m.list() // Refresh file list
+						m.pasteError = err.Error()
 					}
+				} else {
+					m.pastedFilePath = baseName
+					m.list() // Refresh file list
 				}
 				m.updateOffset()
 			}
@@ -842,15 +841,7 @@ func (m *model) filePath() (string, bool) {
 }
 
 func (m *model) pasteFile(srcPath, destPath string) error {
-	srcInfo, err := os.Stat(srcPath)
-	if err != nil {
-		return err
-	}
-	
-	if srcInfo.IsDir() {
-		return copyDir(srcPath, destPath)
-	}
-	return copyFile(srcPath, destPath)
+	return copyTree(srcPath, destPath)
 }
 
 func (m *model) open() tea.Cmd {
